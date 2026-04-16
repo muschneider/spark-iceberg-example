@@ -4,6 +4,7 @@
 /.idea/
 /.bsp/
 /.metals/
+/.mvn/
 /.scala-build/
 AGENTS.md
 CLAUDE.md
