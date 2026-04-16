@@ -5,6 +5,7 @@
 /.bsp/
 /.metals/
 /.mvn/
+/.bloop/
 /.scala-build/
 AGENTS.md
 CLAUDE.md
