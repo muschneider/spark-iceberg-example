@@ -1,0 +1,10 @@
+/target/
+/spark-warehouse/
+/warehouse/
+/.idea/
+/.bsp/
+/.metals/
+/.scala-build/
+AGENTS.md
+CLAUDE.md
+prompts.txt
