@@ -17,7 +17,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
  */
 object Main {
 
-  private val AppName          = "calc-vp-staging"
+  private val AppName          = "spark-iceberg-example"
   private val DefaultCatalog   = "local"
   private val DefaultTableName = "production.features"
 
@@ -43,7 +43,6 @@ object Main {
 
     try {
       persistToIceberg(spark.read.parquet(parquetPath))
-      // Intentionally concise; cluster logs capture the rest via Spark's own logger.
       println(s"Persisted Parquet data from $parquetPath to $DefaultCatalog.$DefaultTableName")
     } finally {
       spark.stop()
