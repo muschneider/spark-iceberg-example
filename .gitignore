@@ -1,6 +1,7 @@
 /target/
 /spark-warehouse/
 /warehouse/
+/shell-scripts/
 /.idea/
 /.bsp/
 /.metals/
