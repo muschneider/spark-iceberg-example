@@ -22,7 +22,7 @@
         <maven.compiler.plugin.version>3.13.0</maven.compiler.plugin.version>
         <maven.surefire.plugin.version>3.5.2</maven.surefire.plugin.version>
         <maven.shade.plugin.version>3.6.0</maven.shade.plugin.version>
-        <main.class>com.example.spark.Main</main.class>
+        <main.class>com.example.spark.FeatCalcMergeApp</main.class>
     </properties>
 
     <dependencies>

@@ -31,3 +31,21 @@ spark-shell \
 --conf 'spark.sql.catalog.local.type=hadoop' \
 --conf "spark.sql.catalog.local.warehouse=file://${PWD}/warehouse"
 """
+
+[tasks.spark-submit-iceberg]
+description = "Run spark-submit with Apache Iceberg support and app_params.properties"
+run = """
+spark-submit \
+--class com.example.spark.FeatCalcMergeApp \
+--packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.10.1 \
+--properties-file ${PWD}/app_params.properties \
+--num-executors 3 \
+--driver-memory 5g \
+--executor-memory 8g \
+--conf 'spark.serializer=org.apache.spark.serializer.KryoSerializer' \
+--conf 'spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions' \
+--conf 'spark.sql.catalog.local=org.apache.iceberg.spark.SparkCatalog' \
+--conf 'spark.sql.catalog.local.type=hadoop' \
+--conf "spark.sql.catalog.local.warehouse=file://${PWD}/warehouse" \
+${PWD}/target/calc-vp-staging-0.1.0-SNAPSHOT.jar
+"""
