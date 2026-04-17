@@ -5,6 +5,7 @@
 /.idea/
 /.bsp/
 /.metals/
+/dag/
 /.mvn/
 /.bloop/
 /.scala-build/
