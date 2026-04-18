@@ -29,7 +29,7 @@ spark-shell \
 --conf 'spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions' \
 --conf 'spark.sql.catalog.local=org.apache.iceberg.spark.SparkCatalog' \
 --conf 'spark.sql.catalog.local.type=hadoop' \
---conf "spark.sql.catalog.local.warehouse=file://${PWD}/warehouse"
+--conf "spark.sql.catalog.local.warehouse=file:/tmp/warehouse"
 """
 
 [tasks.spark-submit-iceberg_run_1]
@@ -46,7 +46,7 @@ spark-submit \
 --conf 'spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions' \
 --conf 'spark.sql.catalog.local=org.apache.iceberg.spark.SparkCatalog' \
 --conf 'spark.sql.catalog.local.type=hadoop' \
---conf "spark.sql.catalog.local.warehouse=file://${PWD}/warehouse" \
+--conf "spark.sql.catalog.local.warehouse=file:/tmp/warehouse" \
 ${PWD}/target/calc-vp-staging-0.1.0-SNAPSHOT.jar
 """
 
@@ -65,6 +65,6 @@ spark-submit \
 --conf 'spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions' \
 --conf 'spark.sql.catalog.local=org.apache.iceberg.spark.SparkCatalog' \
 --conf 'spark.sql.catalog.local.type=hadoop' \
---conf "spark.sql.catalog.local.warehouse=file://${PWD}/warehouse" \
+--conf "spark.sql.catalog.local.warehouse=file:/tmp/warehouse" \
 ${PWD}/target/original-calc-vp-staging-0.1.0-SNAPSHOT.jar
 """

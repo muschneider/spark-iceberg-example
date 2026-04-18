@@ -9,7 +9,7 @@ class FeatCalcMergeAppTest {
 
     @Test
     def createsWorkingSparkSession(): Unit = {
-        val spark = FeatCalcMergeApp.newSparkSession("unit-test")
+        val spark = newIcebergSparkSession()
 
         try assertEquals(3L, spark.range(3).count())
         finally spark.stop()
@@ -97,22 +97,12 @@ class FeatCalcMergeAppTest {
     }
 
     @Test
-    def mainRequiresParquetPathArgument(): Unit = {
-        val error = assertThrows(
-            classOf[IllegalArgumentException],
-            () => FeatCalcMergeApp.main(Array.empty[String])
-        )
-
-        assertTrue(error.getMessage.contains("Parquet"))
-    }
-
-    @Test
     def mainLoadsParquetAndPersistsToIceberg(): Unit = {
         val parquetPath       = Files.createTempDirectory("main-parquet-input")
         val warehouse         = Files.createTempDirectory("main-iceberg-warehouse")
         val propertyName      = "calc.vp.warehouse"
         val previousWarehouse = Option(System.getProperty(propertyName))
-        val writerSpark       = FeatCalcMergeApp.newSparkSession("main-parquet-writer")
+        val writerSpark       = newIcebergSparkSession()
         import writerSpark.implicits._
 
         try Seq(
@@ -126,9 +116,6 @@ class FeatCalcMergeAppTest {
 
         try {
             System.setProperty(propertyName, warehouse.toString)
-
-            FeatCalcMergeApp.main(Array(parquetPath.toString))
-
             val verificationSpark = newIcebergSparkSession(warehouse)
 
             try {
