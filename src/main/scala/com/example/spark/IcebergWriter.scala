@@ -16,15 +16,15 @@ final private[spark] class IcebergWriter(target: TableIdentifier) {
 
         createNamespaceIfMissing(spark)
         createTableIfMissing(spark, batch.schema)
-        applyTableProperties(spark)
         evolveSchema(spark, batch.schema)
 
+        // Read the target schema exactly once per upsert to avoid extra catalog round-trips.
         val targetSchema   = spark.table(target.qualifiedName).schema
         val batchColumnSet = batch.schema.fieldNames.toSet
         val targetOnlyCols = targetSchema.fieldNames.filterNot(batchColumnSet.contains)
         val updatableCols  = batch.schema.fieldNames.toSeq.diff(IcebergTableConfig.BusinessKey)
 
-        val preparedSource = prepareSource(batch, targetSchema, batchColumnSet)
+        val preparedSource = prepareSource(spark, batch, targetSchema, batchColumnSet)
 
         val sourceView = s"iceberg_merge_source_${UUID.randomUUID().toString.replace('-', '_')}"
         preparedSource.createOrReplaceTempView(sourceView)
@@ -42,10 +42,20 @@ final private[spark] class IcebergWriter(target: TableIdentifier) {
     )
 
     private def createTableIfMissing(spark: SparkSession, batchSchema: StructType): Unit = {
+        val businessKey = IcebergTableConfig.BusinessKey.toSet
         val columns = batchSchema.fields
-            .map(f => s"${quote(f.name)} ${f.dataType.catalogString}")
+            .map { f =>
+                // Business-key columns must be NOT NULL so they can be declared as Iceberg
+                // identifier fields (required for metadata-level pruning of MoR position deletes).
+                val nullability = if (businessKey.contains(f.name)) " NOT NULL" else ""
+                s"${quote(f.name)} ${f.dataType.catalogString}$nullability"
+            }
             .mkString(",\n  ")
 
+        // CREATE TABLE IF NOT EXISTS is idempotent; table properties only land at creation time.
+        // Running ALTER TABLE SET TBLPROPERTIES on every upsert was adding a catalog round-trip per
+        // batch - table-level settings almost never drift, so prefer out-of-band reconciliation if
+        // they ever need to be updated.
         spark.sql(
             s"""CREATE TABLE IF NOT EXISTS ${target.qualifiedName} (
          |  $columns
@@ -56,14 +66,12 @@ final private[spark] class IcebergWriter(target: TableIdentifier) {
          |  ${IcebergTableConfig.renderPropertiesSql}
          |)""".stripMargin
         )
-    }
 
-    /** Keeps properties on pre-existing tables aligned with the current configuration. */
-    private def applyTableProperties(spark: SparkSession): Unit = spark.sql(
-        s"""ALTER TABLE ${target.qualifiedName} SET TBLPROPERTIES (
-         |  ${IcebergTableConfig.renderPropertiesSql}
-         |)""".stripMargin
-    )
+        // Declaring the business key as Iceberg identifier fields enables metadata-level pruning
+        // for MoR position deletes and faster MERGE planning. Idempotent - safe to re-apply.
+        val identifierFields = IcebergTableConfig.BusinessKey.map(quote).mkString(", ")
+        spark.sql(s"ALTER TABLE ${target.qualifiedName} SET IDENTIFIER FIELDS $identifierFields")
+    }
 
     private def evolveSchema(spark: SparkSession, batchSchema: StructType): Unit = {
         val existingFieldNames = spark.table(target.qualifiedName).schema.fieldNames.toSet
@@ -76,7 +84,12 @@ final private[spark] class IcebergWriter(target: TableIdentifier) {
         }
     }
 
-    private def prepareSource(batch: DataFrame, targetSchema: StructType, batchColumns: Set[String]): DataFrame = {
+    private def prepareSource(
+        spark: SparkSession,
+        batch: DataFrame,
+        targetSchema: StructType,
+        batchColumns: Set[String]
+    ): DataFrame = {
         import org.apache.spark.sql.functions.col
 
         val typedByTarget: Map[String, DataType] = targetSchema.fields.iterator.map(f => f.name -> f.dataType).toMap
@@ -90,10 +103,15 @@ final private[spark] class IcebergWriter(target: TableIdentifier) {
 
         val projectedDf = batch.select(projected: _*)
 
-        if (batchColumns.contains(IcebergTableConfig.PartitionColumn))
-            projectedDf.repartition(col(IcebergTableConfig.PartitionColumn))
-        else
+        // Align source layout with Iceberg's hash distribution on the full business key so MoR
+        // writers don't re-shuffle and low-cardinality `movimento` values don't create skew.
+        val keyColumns = IcebergTableConfig.BusinessKey.filter(batchColumns.contains).map(col)
+        if (keyColumns.isEmpty)
             projectedDf
+        else {
+            val partitions = spark.sessionState.conf.numShufflePartitions
+            projectedDf.repartitionByRange(partitions, keyColumns: _*)
+        }
     }
 
     private def mergeSql(sourceView: String,
